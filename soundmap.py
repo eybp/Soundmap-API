@@ -1,7 +1,7 @@
 from urllib.parse import urlencode
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
-import requests, json, socket, time, uuid, datetime, logging, urllib.parse
+import cloudscraper, json, socket, time, uuid, datetime, logging, urllib.parse
 
 logging.basicConfig(level=logging.DEBUG, filename='trade_log.log', filemode='a', 
                     format='%(asctime)s - %(levelname)s - %(message)s')
@@ -52,10 +52,10 @@ class Soundmap:
             backoff_factor=1
         )
 
-        self.http = requests.Session()
+        self.scraper = cloudscraper.create_scraper()
         adapter = HTTPAdapter(max_retries=self.retry_strategy)
-        self.http.mount("https://", adapter)
-        self.http.mount("http://", adapter)
+        self.scraper.mount("https://", adapter)
+        self.scraper.mount("http://", adapter)
 
     def get_unique_timestamp(self, hour, minute):
         today = datetime.date.today()
@@ -82,19 +82,19 @@ class Soundmap:
         
         bio_url = f"{self.API_BASE}{self.API_SET_BIO}"
         try:
-            response = self.http.post(f"{bio_url}", headers=self.headers, json=bio_payload)
+            response = self.scraper.post(f"{bio_url}", headers=self.headers, json=bio_payload)
             response.raise_for_status()
             if response.status_code == 200:
                 return True
             return False
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Error claiming daily free coins: {e}")
             return None
 
     def search_song(self, song_id):
         url = self.build_url_song(song_id)
         try:
-            response = self.http.get(url, headers=self.headers)
+            response = self.scraper.get(url, headers=self.headers)
             response.raise_for_status()
             data = response.json()
             #print(f"Data for song_id {song_id}: {data}")  # debugging
@@ -128,7 +128,7 @@ class Soundmap:
 
             return {"song": song_data}
 
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print("Error:", e)
             return None
         
@@ -147,7 +147,7 @@ class Soundmap:
             try:
                 socket.gethostbyname('api10.soundmap.dev')
 
-                response = self.http.get(fetch_url, headers=self.headers)
+                response = self.scraper.get(fetch_url, headers=self.headers)
                 response.raise_for_status()
                 songs_data = response.json()
 
@@ -193,7 +193,7 @@ class Soundmap:
 
             except socket.gaierror as e:
                 print(f"DNS resolution error: {e}")
-            except requests.exceptions.RequestException as e:
+            except Exception as e:
                 print(f"Error fetching songs: {e}")
 
             time.sleep(backoff_factor ** attempt)
@@ -221,7 +221,7 @@ class Soundmap:
         trade_url = f"{self.API_BASE}{self.API_CREATE_TRADE_OFFER}"
 
         try:
-            response = self.http.post(f"{trade_url}", headers=self.headers, json=trade_offer)
+            response = self.scraper.post(f"{trade_url}", headers=self.headers, json=trade_offer)
             response.raise_for_status()
             #print(response.json())
             if response.status_code == 200:
@@ -229,7 +229,7 @@ class Soundmap:
             
             return False, None
             #return response.json()
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Error creating trade offer: {e}")
             logging.error(f"Error creating trade offer: {e}")
             return None, None
@@ -245,21 +245,21 @@ class Soundmap:
         delete_url = f"{self.API_BASE}{self.API_DELETE_TRADE_OFFER}"
 
         try:
-            response = self.http.post(f"{delete_url}", headers=self.headers, json=trade_offer)
+            response = self.scraper.post(f"{delete_url}", headers=self.headers, json=trade_offer)
             response.raise_for_status()
             if response.status_code == 200:
                 return True
             return False
         
             #return response.json()
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Error deleting trade offer: {e}")
             return None
         
     def fetch_trade_data(self):
         notifs_url = f"{self.API_BASE}{self.API_NOTIFS}"
         try:
-            response = self.http.get(notifs_url, headers=self.headers)
+            response = self.scraper.get(notifs_url, headers=self.headers)
             response.raise_for_status()
             data = response.json()
             #print(f"Trade data: {data}")  # Debugging output
@@ -274,7 +274,7 @@ class Soundmap:
 
             return active_trades
         
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print("Error fetching trade data:", e)
             return None
         
@@ -368,13 +368,13 @@ class Soundmap:
     def notification_count(self):
         notification_url = f"{self.API_BASE}{self.API_UNREAD_NOTIFICATIONS_COUNT}"
         try:
-            response = self.http.get(f"{notification_url}", headers=self.headers)
+            response = self.scraper.get(f"{notification_url}", headers=self.headers)
             response.raise_for_status()
             if response.status_code == 200:
                 data = response.json()
                 count = data[0]['result']['data']['count']
                 return count
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Error deleting trade offer: {e}")
             return None
         
@@ -408,15 +408,15 @@ class Soundmap:
         acceptance_url = f"{self.API_BASE}{self.API_SEND_TRADE_ACCEPTANCE_EMOJI}"
 
         try:
-            response = self.http.post(f"{accept_url}", headers=self.headers, json=accept_offer)
+            response = self.scraper.post(f"{accept_url}", headers=self.headers, json=accept_offer)
             response.raise_for_status()
             if response.status_code == 200:
                 if emoji_response:
-                    response = self.http.post(f"{acceptance_url}", headers=self.headers, json=accept_reaction)
+                    response = self.scraper.post(f"{acceptance_url}", headers=self.headers, json=accept_reaction)
                 if note_response:
-                    response = self.http.post(f"{acceptance_url}", headers=self.headers, json=accept_reaction)
+                    response = self.scraper.post(f"{acceptance_url}", headers=self.headers, json=accept_reaction)
             return True
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Error creating trade offer: {e}")
             return None
         
@@ -450,15 +450,15 @@ class Soundmap:
         rejection_url = f"{self.API_BASE}{self.API_SEND_TRADE_REJECTION_EMOJI}"
 
         try:
-            response = self.http.post(f"{reject_url}", headers=self.headers, json=reject_offer)
+            response = self.scraper.post(f"{reject_url}", headers=self.headers, json=reject_offer)
             response.raise_for_status()
             if response.status_code == 200:
                 if emoji_response:
-                    response = self.http.post(f"{rejection_url}", headers=self.headers, json=reject_reaction)
+                    response = self.scraper.post(f"{rejection_url}", headers=self.headers, json=reject_reaction)
                 if note_response:
-                    response = self.http.post(f"{rejection_url}", headers=self.headers, json=reject_reaction)
+                    response = self.scraper.post(f"{rejection_url}", headers=self.headers, json=reject_reaction)
             return True
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Error rejecting trade offer: {e}")
             return None
             
@@ -479,7 +479,7 @@ class Soundmap:
         claim_url = f"{self.API_BASE}{self.API_CLAIM_LOOTBOX}"
 
         try:
-            response = requests.post(f"{claim_url}", headers=self.headers, json=lootbox_type)
+            response = self.scraper.post(f"{claim_url}", headers=self.headers, json=lootbox_type)
             print(response.text)
             response.raise_for_status()
             if response.status_code == 200:
@@ -487,7 +487,7 @@ class Soundmap:
             return False
         
             #return response.json()
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Error claiming lootbox offer: {e}")
             return None
 
@@ -497,19 +497,19 @@ class Soundmap:
         coin_url = f"{self.API_BASE}{self.API_CLAIM_COINS}"
 
         try:
-            response = self.http.post(f"{coin_url}", headers=self.headers, json=coin_data)
+            response = self.scraper.post(f"{coin_url}", headers=self.headers, json=coin_data)
             response.raise_for_status()
             if response.status_code == 200:
                 return True
             return False
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Error claiming daily free coins: {e}")
             return None
 
     def fetch_open_trade_ids(self):
         url = f"{self.API_BASE}{self.API_OPEN_TRADE_REQUESTS_OFFERS}"
         try:
-            response = self.http.get(url, headers=self.headers)
+            response = self.scraper.get(url, headers=self.headers)
             response.raise_for_status()
             data = response.json()
             open_trade_ids = []
@@ -518,14 +518,14 @@ class Soundmap:
                 open_trade_ids.append(trade['tradeOffer']['id'])
 
             return open_trade_ids
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Error fetching open trade IDs: {e}")
             return None
         
     def fetch_quests(self, artist=None):
         fetch_url = f"{self.API_BASE}{self.API_ARTIST_QUESTS}"
         try:
-            response = self.http.get(fetch_url, headers=self.headers)
+            response = self.scraper.get(fetch_url, headers=self.headers)
             response.raise_for_status()
             data = response.json()
             if isinstance(data, list):
@@ -548,7 +548,7 @@ class Soundmap:
             else:
                 return {"message": "Unexpected data format received from API."}
 
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Error fetching quests: {e}")
             return None
         
@@ -566,10 +566,10 @@ class Soundmap:
     def get_quest_trade_data(self, quest_requirements):
         trade_url = self.build_quest_trade_url(quest_requirements)
         try:
-            response = self.http.get(trade_url, headers=self.headers)
+            response = self.scraper.get(trade_url, headers=self.headers)
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Error fetching trade data: {e}")
             return None
         
@@ -585,12 +585,12 @@ class Soundmap:
         url = f"{self.API_BASE}{self.API_ADD_SONG_TO_FOLDER}"
 
         try:
-            response = self.http.post(url, headers=self.headers, json=payload)
+            response = self.scraper.post(url, headers=self.headers, json=payload)
             response.raise_for_status()
             if response.status_code == 200:
                 return True
             return False
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Error adding song to folder: {e}")
             return None
        
@@ -606,12 +606,12 @@ class Soundmap:
         url = f"{self.API_BASE}{self.API_REMOVE_SONG_FROM_FOLDER}"
 
         try:
-            response = self.http.post(url, headers=self.headers, json=payload)
+            response = self.scraper.post(url, headers=self.headers, json=payload)
             response.raise_for_status()
             if response.status_code == 200:
                 return True
             return False
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Error adding song to folder: {e}")
             return None
         
@@ -627,7 +627,7 @@ class Soundmap:
             try:
                 socket.gethostbyname('api10.soundmap.dev')
 
-                response = self.http.get(fetch_url, headers=self.headers)
+                response = self.scraper.get(fetch_url, headers=self.headers)
                 response.raise_for_status()
                 songs_data = response.json()
 
@@ -635,7 +635,7 @@ class Soundmap:
 
             except socket.gaierror as e:
                 print(f"DNS resolution error: {e}")
-            except requests.exceptions.RequestException as e:
+            except Exception as e:
                 print(f"Error fetching songs: {e}")
 
 
@@ -678,7 +678,7 @@ class Soundmap:
         url = f"{self.API_BASE}{self.API_SEARCH}&input={encoded_query}"
 
         try:
-            response = requests.get(url, headers=self.headers)
+            response = self.scraper.get(url, headers=self.headers)
             response.raise_for_status()
             data = response.json()
 
@@ -716,6 +716,6 @@ class Soundmap:
 
             return matching_songs if matching_songs else "Please check a different rarity."
 
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"Error in search: {e}")
             return None
