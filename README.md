@@ -1,3 +1,6 @@
+edited to replace requests with cloudscraper; theoretically fixing api
+
+
 
 # Soundmap API
 
